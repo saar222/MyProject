@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Direct Random Generator</title>
+</head>
+<body>
+    <h2>Direct execution of a random generator</h2>
+    <!-- Main form for direct random number generation -->
+    <form method="post">
+        <!-- Upper bound for random generator (user input) -->
+        <label for="upper_bound">Upper Bound:</label>
+        <input type="number" name="upper_bound" id="upper_bound" value="2147483647" required>
+        <!-- Display of valid upper bounds for each generator type -->
+        <small>
+            (time_generator max_upper_bound is 999999) 
+            (sound_generator max_upper_bound is 10^18) 
+            (java_thread max_upper_bound is 2147483647 (int))
+        </small>
+        <br><br>
+        <!-- Each button triggers the form for a specific random generator -->
+        <button type="submit" name="algo" value="javathreads"> Generate Random Number (Java threads)</button>
+        <button type="submit" name="algo" value="time">Generate Random Number (Time Nano)</button>
+        <button type="submit" name="algo" value="sound">Generate Random Number (Sound code)</button>
+        <button type="submit" name="algo" value="pythonrand">Generate Random Number (import random)</button>
+    </form>
+
+    <!-- Output area: shows the result if output variable is set (Jinja2 block - server side) -->
+    {% if output %}
+    <hr>
+    <h3>=== OUTPUT ===</h3>
+    <div style="margin-top:24px; font-size:2em; color:#224488;">
+        {{ output }}
+    </div>
+    {% endif %}
+
+    <br>
+
+    <!-- Button form for navigation to the full tests page -->
+    <form action="{{ url_for('tests') }}" method="get">
+        <button type="submit">MOVE TO TESTS PAGE</button>
+    </form>
+    <!-- Decorative image: cubes visual (served from static folder) -->
+    <img src="{{ url_for('static', filename='cubes.jpg') }}" alt="cubes" style="width:800px;">
+</body>
+</html>

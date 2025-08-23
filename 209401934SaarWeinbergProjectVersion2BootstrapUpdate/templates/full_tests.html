@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% block title %}Statistical Randomness Tests{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header text-center">
+                <h2 class="mb-0">
+                    <i class="bi bi-graph-up"></i> Statistical Randomness Tests
+                </h2>
+                <p class="mb-0 mt-2 opacity-75">Comprehensive analysis of random number generator quality</p>
+            </div>
+            <div class="card-body p-4">
+                <!-- Test Configuration Form -->
+                <form id="testForm" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="generator" class="form-label fw-bold">
+                                <i class="bi bi-gear-fill text-primary"></i> Generator
+                            </label>
+                            <select name="generator" id="generator" class="form-select" required>
+                                <option value="">Choose Generator...</option>
+                                <option value="pythonrand">Python Random</option>
+                                <option value="javathreads">Java Threads</option>
+                                <option value="time">Time Nano</option>
+                                <option value="sound">Sound</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="test_type" class="form-label fw-bold">
+                                <i class="bi bi-clipboard-check-fill text-success"></i> Test Type
+                            </label>
+                            <select name="test_type" id="test_type" class="form-select" required>
+                                <option value="">Choose Test...</option>
+                                <option value="frequency">Frequency Test</option>
+                                <option value="runs">Runs Test</option>
+                                <option value="freq_byte">Chi-Square (Bytes)</option>
+                                <option value="serial2">Serial Test (Pairs)</option>
+                                <option value="serial3">Serial Test (Triplets)</option>
+                                <option value="autocorr1">Autocorrelation (Lag=1)</option>
+                                <option value="autocorr2">Autocorrelation (Lag=2)</option>
+                                <option value="poker4">Poker Test (4-bit)</option>
+                                <option value="poker5">Poker Test (5-bit)</option>
+                                <option value="maurer7">Maurer Universal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="upper_bound" class="form-label fw-bold">
+                                <i class="bi bi-arrow-up-circle-fill text-warning"></i> Upper Bound
+                            </label>
+                            <input type="number" name="upper_bound" id="upper_bound" 
+                                   class="form-control" value="999999" min="1"  required>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="samples" class="form-label fw-bold">
+                                <i class="bi bi-collection-fill text-info"></i> Samples
+                            </label>
+                            <input type="number" name="samples" id="samples" 
+                                   class="form-control" value="500" min="10"  required>
+                        </div>
+                        <div class="col-md-2 mb-3 d-flex align-items-end">
+                            <div class="d-grid w-100">
+                                <button type="submit" id="startBtn" class="btn btn-success">
+                                    <i class="bi bi-play-fill"></i> Start Test
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Progress Section -->
+                <div id="testProgress" class="mb-4" style="display: none;">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-hourglass-split"></i> Test Progress
+                                </h5>
+                                <div>
+                                    <button type="button" id="stopBtn" class="btn btn-danger btn-sm me-2" style="display: none;">
+                                        <i class="bi bi-stop-fill"></i> Stop Test
+                                    </button>
+                                    <button type="button" id="restartBtn" class="btn btn-warning btn-sm" style="display: none;">
+                                        <i class="bi bi-arrow-clockwise"></i> Restart Page
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                    0%
+                                </div>
+                            </div>
+                            <div id="statusText" class="status-text text-muted">
+                                Initializing test...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="testResult" class="mb-4"></div>
+
+                <!-- Test Information -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="bi bi-info-circle-fill"></i> Available Tests
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><strong>Basic Tests:</strong></h6>
+                                <ul>
+                                    <li><strong>Frequency Test:</strong> Checks balance of 0s and 1s</li>
+                                    <li><strong>Runs Test:</strong> Analyzes continuous sequences</li>
+                                    <li><strong>Chi-Square:</strong> Tests uniformity of byte values</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><strong>Advanced Tests:</strong></h6>
+                                <ul>
+                                    <li><strong>Serial Tests:</strong> Pattern frequency analysis</li>
+                                    <li><strong>Autocorrelation:</strong> Bit dependency tests</li>
+                                    <li><strong>Poker Test:</strong> Distribution of bit groups</li>
+                                    <li><strong>Maurer Universal:</strong> Compressibility analysis</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentTaskId = null;
+let statusInterval = null;
+let currentGeneratorName = null; // Store generator name for results
+
+document.addEventListener('DOMContentLoaded', function() {
+    const testForm = document.getElementById('testForm');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const progressDiv = document.getElementById('testProgress');
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('statusText');
+    const resultDiv = document.getElementById('testResult');
+
+    // Start test
+    testForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(testForm);
+        
+        // Validate form
+        if (!formData.get('generator') || !formData.get('test_type')) {
+            showToast('Error', 'Please select both generator and test type', 'error');
+            return;
+        }
+
+        // Store generator name for results
+        currentGeneratorName = formData.get('generator');
+
+        // Show progress and disable form
+        progressDiv.style.display = 'block';
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting...';
+        stopBtn.style.display = 'inline-block';
+        restartBtn.style.display = 'none'; // Hide restart during test
+        resultDiv.innerHTML = '';
+
+        // Reset progress bar
+        progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', 0);
+        progressBar.textContent = '0%';
+        progressBar.classList.remove('bg-success', 'bg-info');
+        progressBar.classList.add('progress-bar-animated');
+
+        // Start test
+        fetch('/start_test', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            currentTaskId = data.task_id;
+            statusInterval = setInterval(checkTestStatus, 2000);
+            
+            showToast('Success', 'Test started successfully!', 'success');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error', 'Failed to start test: ' + error.message, 'error');
+            resetTestUI();
+        });
+    });
+
+    // Stop test
+    stopBtn.addEventListener('click', function() {
+        if (!currentTaskId) return;
+        
+        const formData = new FormData();
+        formData.append('task_id', currentTaskId);
+        
+        fetch('/stop_test', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            showToast('Info', 'Test stop requested...', 'info');
+        })
+        .catch(error => {
+            console.error('Error stopping test:', error);
+            showToast('Error', 'Failed to stop test', 'error');
+        });
+    });
+
+    // Restart button - redirect to tests page
+    restartBtn.addEventListener('click', function() {
+        window.location.href = '/tests';
+    });
+
+    // Check test status
+    function checkTestStatus() {
+        if (!currentTaskId) return;
+
+        fetch(`/status/${currentTaskId}`)
+        .then(response => response.json())
+        .then(data => {
+            statusText.textContent = data.status || 'Unknown status';
+            
+            // Parse progress from status
+            const match = data.status.match(/(\d+)%/);
+            if (match) {
+                const percent = parseInt(match[1]);
+                updateProgressBar(percent);
+            }
+            
+            // Check if test is done
+            if (data.done === true) {
+                clearInterval(statusInterval);
+                statusInterval = null;
+                
+                // Ensure progress shows 100% when done
+                updateProgressBar(100);
+                
+                // Display result with generator name
+                if (data.result) {
+                    const generatorNames = {
+                        'javathreads': 'Java Threads Generator',
+                        'time': 'Time Nano Generator', 
+                        'sound': 'Sound Generator',
+                        'pythonrand': 'Python Generator (import random)'
+                    };
+                    
+                    const generatorDisplayName = generatorNames[currentGeneratorName] || currentGeneratorName;
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result-card">
+                            <h4 class="mb-3">
+                                <i class="bi bi-check-circle-fill"></i> Test Results
+                            </h4>
+                            <div class="mb-3">
+                                <strong>Generator:</strong> ${generatorDisplayName}
+                            </div>
+                            <div class="bg-dark text-light p-3 rounded">
+                                <pre style="margin: 0; white-space: pre-wrap; font-family: 'Courier New', monospace;">${escapeHtml(data.result)}</pre>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Reset UI with restart button
+                resetTestUI(true);
+                showToast('Success', 'Test completed!', 'success');
+            }
+        })
+        .catch(error => {
+            console.error('Error checking status:', error);
+            clearInterval(statusInterval);
+            statusInterval = null;
+            resetTestUI();
+            showToast('Error', 'Error checking test status', 'error');
+        });
+    }
+
+    // Update progress bar with better visual feedback
+    function updateProgressBar(percent) {
+        progressBar.style.width = `${percent}%`;
+        progressBar.setAttribute('aria-valuenow', percent);
+        progressBar.textContent = `${percent}%`;
+        
+        // Update color and animation based on progress
+        if (percent >= 100) {
+            progressBar.classList.remove('progress-bar-animated', 'bg-info');
+            progressBar.classList.add('bg-success');
+        } else if (percent >= 50) {
+            progressBar.classList.add('bg-info');
+        }
+    }
+
+    // Reset test UI
+    function resetTestUI(showRestartButton = false) {
+        if (showRestartButton) {
+            startBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Run Another Test';
+            startBtn.classList.remove('btn-success');
+            startBtn.classList.add('btn-primary');
+            restartBtn.style.display = 'inline-block'; // Show restart button
+        } else {
+            startBtn.innerHTML = '<i class="bi bi-play-fill"></i> Start Test';
+            startBtn.classList.remove('btn-primary');
+            startBtn.classList.add('btn-success');
+            restartBtn.style.display = 'none'; // Hide restart button
+        }
+        
+        startBtn.disabled = false;
+        stopBtn.style.display = 'none';
+        currentTaskId = null;
+        
+        if (statusInterval) {
+            clearInterval(statusInterval);
+            statusInterval = null;
+        }
+    }
+
+    // Utility function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>
+{% endblock %}
