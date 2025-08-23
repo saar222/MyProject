@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tests Randomness Of Codes</title>
+    <style>
+        /* Basic page styling for a clean UI */
+        body { font-family: Arial, sans-serif; }
+        label { display: block; margin-top: 10px; }
+        select, input { margin-bottom: 10px; width: 270px; }
+        button { margin-right: 10px; }
+        #progress { margin-top: 14px; }
+    </style>
+</head>
+<body>
+    <h1>Tests Randomness Of Codes</h1>
+    <!-- The main form: user picks random generator, test type, sample count, and upper bound -->
+    <form id="testForm">
+        <!-- Generator selector (dropdown) -->
+        <label for="generator">Choose random generator:</label>
+        <select name="generator" id="generator" required>
+            <option value="javathreads">Java threads random generator</option>
+            <option value="time">Time Nano random generator</option>
+            <option value="sound">Sound random generator</option>
+            <option value="pythonrand">(import random) generator</option>
+        </select>
+
+        <!-- Statistical test selector (dropdown) -->
+        <label for="test_type">Choose test name:</label>
+        <select name="test_type" id="test_type" required>
+            <option value="frequency">Frequency Test (Chi-Squared)</option>
+            <option value="runs">Runs Test</option>
+            <option value="freq_byte">Chi-Square Test (per byte)</option>
+            <option value="serial2">Serial Test (pairs)</option>
+            <option value="serial3">Serial Test (triplets)</option>
+            <option value="autocorr1">Autocorrelation Test (lag=1)</option>
+            <option value="autocorr2">Autocorrelation Test (lag=2)</option>
+            <option value="poker4">Poker Test (group size 4)</option>
+            <option value="poker5">Poker Test (group size 5)</option>
+            <option value="maurer7">Maurer’s Universal Test (L=7)</option>
+        </select>
+
+        <!-- Number of samples chosen by user -->
+        <label for="samples">Number of Samples:</label>
+        <input type="number" id="samples" name="samples" min="1" value="500" required>
+        <small>
+            <!-- Notes for performance depending on generator -->
+            ((generator_name ~time_sec_in_my_computer/amount_samples)  
+             (javathread ~18s/100), 
+             (import_random ~3s/10,000), 
+             (sound ~9s/100) 
+             (time ~16s/1000)
+        </small>
+
+        <!-- Upper bound chosen by user, with generator limitation -->
+        <label for="upper_bound">Upper Bound for generator:</label>
+        <input type="number" id="upper_bound" name="upper_bound" min="1" max="2147483647" value="999999" required>
+        <small>
+            (time_generator max_upper_bound is 999999) 
+            (sound_generator max_upper_bound is 10^18) 
+            (java_thread max_upper_bound is 2147483647 (int))
+        </small>
+        
+        <!-- Run and stop buttons for the form -->
+        <div style="margin-top:14px;">
+            <button type="submit" id="runBtn">Run Test</button>
+            <!-- Stop button can interrupt a running test -->
+            <button type="button" id="stopBtn">Stop test</button>
+        </div>
+    </form>
+
+    <!-- Area for displaying test progress/status/result -->
+    <div id="progress">Status: Waiting for test to start...</div>
+    <!-- Simple navigation button -->
+    <button onclick="window.location.href='/'" style="margin-top:14px;">BACK TO MAIN PAGE</button>
+
+    <script>
+        // -----------------------------
+        // JS: Manages form submit, stop test and status polling
+        // -----------------------------
+
+        let currentTaskId = null;   // Active test's task id
+        let pollInterval = null;    // Interval object for status polling
+
+        // Handle test initiation by sending form data to backend via POST
+        document.getElementById('testForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // Prevents page reload
+            document.getElementById('progress').innerText = "Starting test...";
+            const formData = new FormData(this); // Collects all form parameters
+            try {
+                // Sends POST request to start test
+                const res = await fetch('/start_test', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.error) {
+                    document.getElementById('progress').innerText = "Error: " + data.error;
+                } else if (data.task_id) {
+                    // Start polling for test status using the returned ID
+                    currentTaskId = data.task_id;
+                    document.getElementById('progress').innerText = "Test started. Task ID: " + currentTaskId;
+                    startPollingStatus();
+                }
+            } catch (err) {
+                document.getElementById('progress').innerText = "Error communicating with server.";
+            }
+        });
+
+        // Handle stopping the test via backend POST, relevant only for active tasks
+        document.getElementById('stopBtn').addEventListener('click', async function() {
+            if (!currentTaskId) {
+                document.getElementById('progress').innerText = "No running test to stop.";
+                return;
+            }
+            try {
+                const fd = new FormData();
+                fd.append('task_id', currentTaskId);
+                // POST request to stop test
+                const res = await fetch('/stop_test', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.status === 'Stopped') {
+                    document.getElementById('progress').innerText = "Test stopped.";
+                    stopPollingStatus();
+                } else {
+                    document.getElementById('progress').innerText = "Failed to stop test.";
+                }
+            } catch (err) {
+                document.getElementById('progress').innerText = "Error stopping test.";
+            }
+        });
+
+        // Regularly polls for test status (every 2s) and displays result/progress
+        function startPollingStatus() {
+            stopPollingStatus();
+            pollInterval = setInterval(async () => {
+                if (!currentTaskId) return;
+                try {
+                    const res = await fetch(`/status/${currentTaskId}`);
+                    const data = await res.json();
+                    let txt = "";
+                    if (data.status) txt += `Status: ${data.status}\n`;
+                    if (data.result) txt += `Result: ${data.result}\n`;
+                    if (data.done) {
+                        stopPollingStatus();
+                        currentTaskId = null;
+                        txt += "(Test finished)";
+                    }
+                    document.getElementById('progress').innerText = txt;
+                } catch (err) {
+                    document.getElementById('progress').innerText = "Error polling test status.";
+                    stopPollingStatus();
+                }
+            }, 2000); // Polls status every 2 seconds
+        }
+        // Stops polling for status
+        function stopPollingStatus() {
+            if (pollInterval) clearInterval(pollInterval);
+        }
+    </script>
+</body>
+</html>
