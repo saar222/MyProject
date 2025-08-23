@@ -1,1 +1,2 @@
-file:///C:/Users/user/Desktop/Project/templates/index.html
+http://localhost:5000
+http://localhost:5000/tests
